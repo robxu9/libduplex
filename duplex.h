@@ -17,4 +17,8 @@
 #include "meta.h"
 #undef DUPLEX_GUARD
 
+// This sets up libssh threads and calls it to initialise all internal
+// structures, as well as any structures that duplex may utilize globally.
+void duplex_init();
+
 #endif
