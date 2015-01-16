@@ -5,9 +5,10 @@
 
 // Joiner Function Struct
 typedef struct {
-  void* (*function)(void*);
+  duplex_err (*function)(void*, void**);
   void* args;
   void* result;
+  duplex_err error;
 } duplex_joiner;
 
 // Join the SSH thread on the specified peer to execute a

@@ -19,7 +19,7 @@ static void* duplex_peer_handle_joiners(void *arg) {
 
     assert(read(socket, &joiner, sizeof(void*)) == sizeof(void*));
 
-    joiner->result = joiner->function(joiner->args);
+    joiner->error = joiner->function(joiner->args, &joiner->result);
 
     char ok[] = { 0 };
     assert(write(socket, ok, sizeof(char)) == sizeof(char));
@@ -82,7 +82,7 @@ duplex_peer* duplex_peer_new() {
 }
 
 // joiner function
-static void* _duplex_peer_close(void* args) {
+static duplex_err _duplex_peer_close(void* args, void** result) {
   duplex_peer *peer = (duplex_peer*) args;
 
   // clean up sessions here
@@ -90,7 +90,7 @@ static void* _duplex_peer_close(void* args) {
   // now set closed on the peer
   peer->closed = 1;
 
-  return NULL;
+  return ERR_NONE;
 }
 
 duplex_err duplex_peer_close(duplex_peer *peer) {
@@ -114,3 +114,34 @@ int duplex_peer_free(duplex_peer *peer) {
 // duplex_peer_option_set
 // duplex_peer_option_get_str
 // duplex_peer_option_get_int
+
+struct _duplex_peer_connect_s {
+  duplex_peer *peer;
+  const char* endpoint;
+};
+
+static duplex_err _duplex_peer_connect(void* args, void** result) {
+  struct _duplex_peer_connect_s *s = (struct _duplex_peer_connect_s*) args;
+
+  duplex_peer *peer = s->peer;
+  const char* endpoint = s->endpoint;
+
+  return ERR_NONE;
+}
+
+duplex_err duplex_peer_connect(duplex_peer *peer, const char* endpoint) {
+  duplex_joiner joiner;
+  joiner.function = _duplex_peer_connect;
+
+  struct _duplex_peer_connect_s args;
+  args.peer = peer;
+  args.endpoint = endpoint;
+
+  joiner.args = &args;
+
+  duplex_err err = duplex_peer_join_th(peer, &joiner);
+  if (err != ERR_NONE) // something went wrong?
+    return err;
+
+  return joiner.error;
+}

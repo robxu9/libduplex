@@ -7,7 +7,7 @@
 
 #define NAME "Join Tests"
 
-static void* inside_join(void* args) {
+static duplex_err inside_join(void* args, void** result) {
   ck_assert_msg(args != NULL, "args should not be NULL");
 
   pthread_t main = *(pthread_t*)args;
@@ -15,7 +15,8 @@ static void* inside_join(void* args) {
 
   ck_assert_msg(pthread_equal(main, this) == 0, "pthreads should be different");
 
-  return "OK";
+  *result = "OK";
+  return ERR_NONE;
 }
 
 START_TEST(test_join)
