@@ -67,6 +67,9 @@ duplex_err duplex_peer_option_set(duplex_peer *peer, duplex_peer_option option, 
 // char* pointer.
 duplex_err duplex_peer_option_get_str(duplex_peer *peer, duplex_peer_option option, char** value);
 
+// Retrieve a int option. If the option is not an int, an error is returned.
+duplex_err duplex_peer_option_get_int(duplex_peer *peer, duplex_peer_option option, int* value);
+
 // Connect to another peer at the specified endpoint. The endpoint is parsed
 // and a connection is attempted. This _is_ blocking.
 // Endpoints are structured as such:
