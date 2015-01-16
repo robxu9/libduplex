@@ -21,4 +21,7 @@
 // structures, as well as any structures that duplex may utilize globally.
 void duplex_init();
 
+// Tear down the duplex session.
+void duplex_cleanup();
+
 #endif

@@ -9,6 +9,7 @@
 
 START_TEST(test_peer_updown)
 {
+  duplex_init();
 
   duplex_peer *peer = duplex_peer_new();
 
@@ -25,6 +26,7 @@ START_TEST(test_peer_updown)
   int result_free = duplex_peer_free(peer);
   ck_assert_msg(result_free == 0, "result_free != 0: %s", strerror(result_free));
 
+  duplex_cleanup();
 } END_TEST
 
 Suite*

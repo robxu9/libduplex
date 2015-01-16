@@ -8,6 +8,18 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <libssh/libssh.h>
+#include <libssh/callbacks.h>
+
+void duplex_init() {
+  ssh_threads_set_callbacks(ssh_threads_get_pthread());
+  assert(ssh_init() == 0);
+}
+
+void duplex_cleanup() {
+  assert(ssh_finalize() == 0);
+}
+
 // Internal.
 // Join the SSH thread for SSH session operations.
 // Returns non-zero if the peer has closed.

@@ -20,6 +20,7 @@ static void* inside_join(void* args) {
 
 START_TEST(test_join)
 {
+  duplex_init();
 
   duplex_peer *peer = duplex_peer_new();
 
@@ -44,6 +45,7 @@ START_TEST(test_join)
 
   ck_assert_str_eq(joiner.result, "OK");
 
+  duplex_cleanup();
 } END_TEST
 
 Suite*
