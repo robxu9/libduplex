@@ -44,7 +44,13 @@ duplex_peer* duplex_peer_new() {
   int mutex_init = pthread_mutex_init(&peer->mutex, NULL);
   if (mutex_init) {
     // failed! clean up, set errno, die
-    goto cleanup;
+    close(peer->socket[0]);
+    close(peer->socket[1]);
+
+    free(peer);
+
+    errno = mutex_init;
+    return NULL;
   }
 
   // start the thread to get session
@@ -52,18 +58,17 @@ duplex_peer* duplex_peer_new() {
                     duplex_peer_handle_joiners, peer);
   if (thread_init) {
     // failed! clean up, set errno, die
-    goto cleanup;
+    assert(pthread_mutex_destroy(&peer->mutex) == 0);
+
+    close(peer->socket[0]);
+    close(peer->socket[1]);
+
+    free(peer);
+
+    errno = thread_init;
+    return NULL;
   }
 
   // cool, we're ready.
   return peer;
-
-cleanup:
-  close(peer->socket[0]);
-  close(peer->socket[1]);
-
-  free(peer);
-
-  errno = mutex_init;
-  return NULL;
 }
