@@ -25,19 +25,20 @@ typedef union {
 } duplex_peer_option_value;
 
 typedef struct {
-  const duplex_peer_option option;
+  duplex_peer_option option;
   duplex_peer_option_value value;
 } duplex_peer_option_map;
 
 // Endpoint -> Peer Hashing
 typedef struct {
-  const char endpoint[8192];
+  char endpoint[8192];
   ssh_session session;
+  char name[37]; // xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx<NUL>
   UT_hash_handle hh;
 } duplex_peer_session;
 
 typedef struct {
-  const char endpoint[8192];
+  char endpoint[8192];
   ssh_bind bind;
   UT_hash_handle hh;
 } duplex_peer_server;

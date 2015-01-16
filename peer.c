@@ -187,7 +187,7 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
 
     int fd;
 
-    if ((fd = socket(AF_UNIX, SOCK_STREAM, 0) < 0) {
+    if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
       // we can't even make the fd /sigh
       goto connect_bad_endpoint;
     }
@@ -200,7 +200,7 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
 
     int connect_len = strlen(sa.sun_path) + sizeof(sa.sun_family);
 
-    if (connect(fd, (struct sockaddr*)sa, connect_len)) {
+    if (connect(fd, (struct sockaddr*) &sa, connect_len)) {
       // we can't connect... so time to exit
       goto connect_bad_endpoint;
     }
@@ -214,7 +214,7 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
     strcat(full_endpoint, tok);
 
     ssh_options_set(session, SSH_OPTIONS_HOST, full_endpoint);
-    ssh_options_set(session, SSH_OPTIONS_FD, fd);
+    ssh_options_set(session, SSH_OPTIONS_FD, &fd);
     free(full_endpoint);
   } else {
     goto connect_bad_endpoint;
@@ -229,12 +229,14 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
     return ERR_FAIL;
   }
 
-  // FIXME send greeting?
-
   ssh_set_blocking(session, 0);
 
+  // FIXME select on the following conditions:
+  // ~> get global request from "@duplex-greeting" with name, reply TRUE
+  // ~> hit 5 second timeout and kill, return ERR_FAIL
+
   // insert into peer
-  duplex_peer_session peer_session = malloc(sizeof(duplex_peer_session));
+  duplex_peer_session *peer_session = malloc(sizeof(duplex_peer_session));
   assert(peer_session != NULL); // I don't even if it's NULL
 
   strcpy(peer_session->endpoint, endpoint);
