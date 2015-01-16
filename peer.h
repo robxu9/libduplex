@@ -25,19 +25,19 @@ typedef union {
 } duplex_peer_option_value;
 
 typedef struct {
-  duplex_peer_option option;
+  const duplex_peer_option option;
   duplex_peer_option_value value;
 } duplex_peer_option_map;
 
 // Endpoint -> Peer Hashing
 typedef struct {
-  char* endpoint;
+  const char endpoint[8192];
   ssh_session session;
   UT_hash_handle hh;
 } duplex_peer_session;
 
 typedef struct {
-  char* endpoint;
+  const char endpoint[8192];
   ssh_bind bind;
   UT_hash_handle hh;
 } duplex_peer_server;
@@ -85,8 +85,8 @@ duplex_peer_option_value duplex_peer_option_get(duplex_peer *peer, duplex_peer_o
 
 // Connect to another peer at the specified endpoint. The endpoint is parsed
 // and a connection is attempted. This _is_ blocking.
-// Endpoints are structured as such:
-//     tcp://location:port
+// Supported endpoints:
+//     tcp://location:port - if a port is not specified it defaults to 2259
 //     unix:///path/to/socket
 duplex_err duplex_peer_connect(duplex_peer *peer, const char* endpoint);
 

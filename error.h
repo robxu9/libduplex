@@ -24,7 +24,11 @@
 typedef enum {
   ERR_NONE = 0,
   ERR_UNKNOWN,
-  ERR_CLOSED
+  ERR_CLOSED,
+  ERR_LIBSSH,
+  ERR_ALLOC,
+  ERR_ARGS,
+  ERR_FAIL
 } duplex_err;
 
 #endif

@@ -1,11 +1,17 @@
-#include "duplex_internal.h"
-
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
+
+#include <libssh/libssh.h>
+
+#include "duplex_internal.h"
+#include "uthash.h"
 
 // To be passed into pthread_create.
 static void* duplex_peer_handle_joiners(void *arg) {
@@ -126,7 +132,124 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
   duplex_peer *peer = s->peer;
   const char* endpoint = s->endpoint;
 
+  // parse the endpoint
+  char* endpointcpy = malloc(strlen(endpoint) + 1);
+  if (endpointcpy == NULL)
+    return ERR_ALLOC;
+
+  // see if we can grab the protocol
+  char* tok = strtok(endpointcpy, "://");
+  if (tok == NULL) {// there is none
+    free(endpointcpy);
+
+    return ERR_ARGS;
+  }
+
+  ssh_session session = ssh_new();
+  if (session == NULL) {
+    free(endpointcpy);
+
+    return ERR_LIBSSH;
+  }
+
+  // handle based on the protocol
+  if (!strcmp(tok, "tcp")) {
+    // tcp://location:port
+    tok = strtok(NULL, "://");
+    if (tok == NULL)
+      goto connect_bad_endpoint;
+    // location:port
+
+    // now split by :
+    tok = strtok(tok, ":");
+    if (tok == NULL)
+      goto connect_bad_endpoint;
+    // location
+    char* location = tok;
+
+    // port
+    char* port = "2259";
+    tok = strtok(NULL, ":");
+    if (tok != NULL)
+      port = tok;
+
+    ssh_options_set(session, SSH_OPTIONS_HOST, location);
+    ssh_options_set(session, SSH_OPTIONS_PORT_STR, port);
+
+  } else if (!strcmp(tok, "unix")) {
+    // unix:///path/to/socket
+    tok = strtok(NULL, "://");
+    if (tok == NULL)
+      goto connect_bad_endpoint;
+    // /path/to/socket
+
+    // try opening a path to this socket
+
+    int fd;
+
+    if ((fd = socket(AF_UNIX, SOCK_STREAM, 0) < 0) {
+      // we can't even make the fd /sigh
+      goto connect_bad_endpoint;
+    }
+
+    struct sockaddr_un sa; // socket address
+    memset(&sa, 0, sizeof(sa)); // clear the stack alloc
+
+    sa.sun_family = AF_UNIX;
+    strcpy(sa.sun_path, tok);
+
+    int connect_len = strlen(sa.sun_path) + sizeof(sa.sun_family);
+
+    if (connect(fd, (struct sockaddr*)sa, connect_len)) {
+      // we can't connect... so time to exit
+      goto connect_bad_endpoint;
+    }
+
+    char hostname[1023];
+    assert(gethostname(hostname, 1023) == 0);
+
+    char* full_endpoint = malloc(1023 + strlen(tok) + 2);
+    strcpy(full_endpoint, hostname);
+    strcat(full_endpoint, ":");
+    strcat(full_endpoint, tok);
+
+    ssh_options_set(session, SSH_OPTIONS_HOST, full_endpoint);
+    ssh_options_set(session, SSH_OPTIONS_FD, fd);
+    free(full_endpoint);
+  } else {
+    goto connect_bad_endpoint;
+  }
+
+  // moment of truth
+  int rc = ssh_connect(session);
+  if (rc != SSH_OK) {
+    // that didn't work
+    free(endpointcpy);
+    ssh_free(session);
+    return ERR_FAIL;
+  }
+
+  // FIXME send greeting?
+
+  ssh_set_blocking(session, 0);
+
+  // insert into peer
+  duplex_peer_session peer_session = malloc(sizeof(duplex_peer_session));
+  assert(peer_session != NULL); // I don't even if it's NULL
+
+  strcpy(peer_session->endpoint, endpoint);
+  peer_session->session = session;
+
+  HASH_ADD_STR(peer->sessions, endpoint, peer_session);
+
+  free(endpointcpy);
+
   return ERR_NONE;
+
+connect_bad_endpoint:
+  free(endpointcpy);
+  ssh_free(session);
+  return ERR_ARGS;
 }
 
 duplex_err duplex_peer_connect(duplex_peer *peer, const char* endpoint) {
