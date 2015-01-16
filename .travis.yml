@@ -6,10 +6,10 @@ compiler:
 
 before_install:
   - sudo apt-get update
-  - sudo apt-get install build-essential python cmake
+  - sudo apt-get install build-essential python cmake uuid-dev check
 
 install:
-  - "cd .. && git clone https://github.com/robxu9/libssh && cd libssh && mkdir build && cd build && cmake .. && make && sudo make install"
+  - "pushd .. && git clone https://github.com/robxu9/libssh && cd libssh && mkdir build && cd build && cmake .. && make && sudo make install && sudo ldconfig && popd"
 
 script:
   - "./waf configure build"
