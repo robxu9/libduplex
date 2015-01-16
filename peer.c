@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 // To be passed into pthread_create.
-static void* duplex_peer_handle_joiners(void *arg) {
+void* duplex_peer_handle_joiners(void *arg) {
   duplex_peer *peer = (duplex_peer*) arg;
 
   int socket = peer->socket[1];
@@ -33,7 +33,7 @@ duplex_peer* duplex_peer_new() {
   if (peer == NULL)
     return NULL; // errno should still be set
 
-  if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, peer->socket)) {
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, peer->socket)) {
     // failed! make sure we save errno, cleanup, leave
     int old_errno = errno;
     free(peer);
