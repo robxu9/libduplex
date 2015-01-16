@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 // To be passed into pthread_create.
-void* duplex_peer_handle_joiners(void *arg) {
+static void* duplex_peer_handle_joiners(void *arg) {
   duplex_peer *peer = (duplex_peer*) arg;
 
   int socket = peer->socket[1];

@@ -10,7 +10,7 @@
 // Internal.
 // Join the SSH thread for SSH session operations.
 void* duplex_peer_join_th(duplex_peer *peer, duplex_joiner *joiner) {
-  pthread_mutex_lock(&peer->mutex);
+  assert(pthread_mutex_lock(&peer->mutex) == 0);
   int socket = peer->socket[0];
 
   assert(write(socket, &joiner, sizeof(void*)) == sizeof(void*));
