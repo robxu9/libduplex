@@ -1,0 +1,15 @@
+language: c
+
+compiler:
+  - clang
+  - gcc
+
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install build-essential python cmake
+
+install:
+  - "cd .. && git clone https://github.com/robxu9/libssh && cd libssh && mkdir build && cd build && cmake .. && make && sudo make install"
+
+script:
+  - "./waf configure build"

@@ -1,0 +1,38 @@
+building libduplex
+==================
+
+Requirements:
+
+* a computer
+* a keyboard
+* python
+* libuuid (if you're on Linux or Mac OS X, that's fine)
+  - libuuid either comes from util-linux or e2fsprogs
+* libssh
+  - must enable server mode
+  - we make and handle custom requests, so we need a custom build of
+    libssh so that we don't throw the requests away
+  - see libssh fork at https://github.com/robxu9/libssh
+  - that branch is rebased often from the main libssh git master
+* check
+  - optional; only if you want to do some unit testing (recommended!)
+
+Building:
+
+We use the waf build system, because it's easier to work with.
+
+Configuring: ./waf configure (gnu options work, see --help)
+Building: ./waf build (if you have check, it automatically does testing)
+Installing: ./waf install
+
+Debugging:
+
+If you installed libssh to a non-standard directory, it may be helpful to use:
+  LD_LIBRARY_PATH=/opt/libssh/lib PKG_CONFIG_PATH=/opt/libssh/lib/pkgconfig
+  (DYLD_LIBRARY_PATH on Mac OS X)
+
+Add debugging symbols and make all warnings errors:
+  CFLAGS="-g -Wall -Werror"
+
+If you want to gdb the unit tests, you'll need the following environment variable:
+  CK_FORK=no (in order to prevent check from forking every test)
