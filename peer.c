@@ -110,3 +110,7 @@ int duplex_peer_free(duplex_peer *peer) {
   free(peer);
   return 0;
 }
+
+// duplex_peer_option_set
+// duplex_peer_option_get_str
+// duplex_peer_option_get_int

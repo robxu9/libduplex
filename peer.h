@@ -14,6 +14,21 @@
 #include "error.h"
 #include "uthash.h"
 
+// Peer options
+typedef enum {
+  OP_UNKNOWN = 0
+} duplex_peer_option;
+
+typedef union {
+  int i;
+  char* str;
+} duplex_peer_option_value;
+
+typedef struct {
+  duplex_peer_option option;
+  duplex_peer_option_value value;
+} duplex_peer_option_map;
+
 // Endpoint -> Peer Hashing
 typedef struct {
   char* endpoint;
@@ -36,6 +51,8 @@ typedef struct {
 
   int closed; // if the peer is closed
 
+  duplex_peer_option_map *options; // options for the peer
+
   duplex_peer_session *sessions; // active connections (should only be touched by ssh thread)
   duplex_peer_server *servers; // ssh servers (should only be touched by ssh thread)
 } duplex_peer;
@@ -52,23 +69,19 @@ duplex_err duplex_peer_close(duplex_peer *peer);
 // non-zero value is returned, following errno values.
 int duplex_peer_free(duplex_peer *peer);
 
-// Peer options
-typedef enum {
-  OP_UNKNOWN = 0
-} duplex_peer_option;
+// Set an option to its corresponding value. The value depends on
+// the option provided. If the value provided is not the type that libduplex
+// expects, the library will probably crash.
+// The char* value passed in is copied by the library.
+void duplex_peer_option_set_str(duplex_peer *peer, duplex_peer_option option, const char* value);
 
 // Set an option to its corresponding value. The value depends on
-// the option provided. If the value provided is not the type
-// that libduplex expects, the library will return an error.
-duplex_err duplex_peer_option_set(duplex_peer *peer, duplex_peer_option option, const void* value);
+// the option provided. If the value provided is not the type that libduplex
+// expects, the library will probably crash.
+void duplex_peer_option_set_int(duplex_peer *peer, duplex_peer_option option, const int value);
 
-// Retrieve a string option. If the option is not a string, an error is
-// returned. It is the client's responsibility to free the returned
-// char* pointer.
-duplex_err duplex_peer_option_get_str(duplex_peer *peer, duplex_peer_option option, char** value);
-
-// Retrieve a int option. If the option is not an int, an error is returned.
-duplex_err duplex_peer_option_get_int(duplex_peer *peer, duplex_peer_option option, int* value);
+// Retrieve a peer option.
+duplex_peer_option_value duplex_peer_option_get(duplex_peer *peer, duplex_peer_option option);
 
 // Connect to another peer at the specified endpoint. The endpoint is parsed
 // and a connection is attempted. This _is_ blocking.
