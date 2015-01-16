@@ -9,7 +9,8 @@ HEADERS = [
     'channel.h',
     'error.h',
     'meta.h',
-    'peer.h'
+    'peer.h',
+    'uthash.h'
     ]
 SOURCES = 'duplex.c'
 

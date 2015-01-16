@@ -6,12 +6,28 @@
 #define DUPLEX_H_PEER
 
 #include <stdlib.h>
+#include <pthread.h>
+
+#include <libssh/libssh.h>
 
 #include "error.h"
+#include "uthash.h"
+
+// Endpoint -> Peer Hashing
+typedef struct {
+  char* endpoint;
+  ssh_session *session;
+  UT_hash_handle hh;
+} duplex_peer_active;
 
 // Duplex Peer
 typedef struct {
+  int socket[2]; // sockets to communicate with ssh thread
+                 // clients use [0], ssh session uses [1]
+  pthread_t thread;
+  pthread_mutex_t mutex; // ssh thread mutex
 
+  duplex_peer_active *sessions; // ssh session (should only be touched by ssh thread)
 } duplex_peer;
 
 // Create a new duplex peer. If there is an error, this returns NULL and
