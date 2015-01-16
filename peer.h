@@ -9,6 +9,7 @@
 #include <pthread.h>
 
 #include <libssh/libssh.h>
+#include <libssh/server.h>
 
 #include "error.h"
 #include "uthash.h"
@@ -16,9 +17,15 @@
 // Endpoint -> Peer Hashing
 typedef struct {
   char* endpoint;
-  ssh_session *session;
+  ssh_session session;
   UT_hash_handle hh;
-} duplex_peer_active;
+} duplex_peer_client;
+
+typedef struct {
+  char* endpoint;
+  ssh_bind bind;
+  UT_hash_handle hh;
+} duplex_peer_server;
 
 // Duplex Peer
 typedef struct {
@@ -28,8 +35,9 @@ typedef struct {
   pthread_mutex_t mutex; // ssh thread mutex
 
   int closed; // if the peer is closed
-  
-  duplex_peer_active *sessions; // ssh session (should only be touched by ssh thread)
+
+  duplex_peer_client *clients; // ssh clients (should only be touched by ssh thread)
+  duplex_peer_server *servers; // ssh servers (should only be touched by ssh thread)
 } duplex_peer;
 
 // Create a new duplex peer. If there is an error, this returns NULL and
@@ -40,9 +48,9 @@ duplex_peer *duplex_peer_new();
 // is not usable once this method returns.
 duplex_err duplex_peer_close(duplex_peer *peer);
 
-// Free the peer and all internal data structures. If there is an error, an
-// error is returned annd errno will probably be set.
-duplex_err duplex_peer_free(duplex_peer *peer);
+// Free the peer and all internal data structures. If there is an error, a
+// non-zero value is returned, following errno values.
+int duplex_peer_free(duplex_peer *peer);
 
 // Peer options
 typedef enum {
@@ -70,6 +78,12 @@ duplex_err duplex_peer_connect(duplex_peer *peer, const char* endpoint);
 // not connected, this returns an error.
 duplex_err duplex_peer_disconnect(duplex_peer *peer, const char* endpoint);
 
+// Get the number of connections made to remote hosts.
+size_t duplex_peer_connected_len(duplex_peer *peer);
+
+// Fill in the string array with the list of endpoints.
+void duplex_peer_connected(duplex_peer *peer, char* endpoints[], size_t size);
+
 // Bind to an endpoint. This _is_ blocking.
 // Endpoints are structured as such:
 //     tcp://location:port (use 0.0.0.0 for global access)
@@ -79,6 +93,12 @@ duplex_err duplex_peer_bind(duplex_peer *peer, const char* endpoint);
 // Unbind from an endpoint. If the endpoint was not bound, this returns
 // an error.
 duplex_err duplex_peer_unbind(duplex_peer *peer, const char* endpoint);
+
+// Get the number of bound sockets open.
+size_t duplex_peer_bound_len(duplex_peer *peer);
+
+// Fill in the string array with the list of endpoints
+void duplex_peer_bound(duplex_peer *peer, char* endpoints[], size_t size);
 
 // Get the number of remote peers
 size_t duplex_peer_remote_len(duplex_peer *peer);

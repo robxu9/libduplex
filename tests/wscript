@@ -11,6 +11,7 @@ def build(bld):
     
     # tests
     bld.program(features='test', source='join.c', target='join', use=['duplex', 'CHECK'])
+    bld.program(features='test', source='peer.c', target='join', use=['duplex', 'CHECK'])
     
     # show the summary
     from waflib.Tools import waf_unit_test

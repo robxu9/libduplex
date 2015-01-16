@@ -80,3 +80,33 @@ duplex_peer* duplex_peer_new() {
   // cool, we're ready.
   return peer;
 }
+
+// joiner function
+static void* _duplex_peer_close(void* args) {
+  duplex_peer *peer = (duplex_peer*) args;
+
+  // clean up sessions here
+
+  // now set closed on the peer
+  peer->closed = 1;
+
+  return NULL;
+}
+
+duplex_err duplex_peer_close(duplex_peer *peer) {
+  duplex_joiner joiner;
+  joiner.function = _duplex_peer_close;
+  joiner.args = peer;
+
+  return duplex_peer_join_th(peer, &joiner);
+}
+
+int duplex_peer_free(duplex_peer *peer) {
+  if (!peer->closed) {
+    return EBUSY;
+  }
+
+  assert(pthread_mutex_destroy(&peer->mutex) == 0);
+  free(peer);
+  return 0;
+}
