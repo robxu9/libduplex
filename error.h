@@ -22,7 +22,9 @@
 // or other such environment errors, assert() will be used and the library
 // WILL crash.
 typedef enum {
-  ERR_UNKNOWN = 0
+  ERR_NONE = 0,
+  ERR_UNKNOWN,
+  ERR_CLOSED
 } duplex_err;
 
 #endif

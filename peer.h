@@ -27,6 +27,8 @@ typedef struct {
   pthread_t thread;
   pthread_mutex_t mutex; // ssh thread mutex
 
+  int closed; // if the peer is closed
+  
   duplex_peer_active *sessions; // ssh session (should only be touched by ssh thread)
 } duplex_peer;
 

@@ -19,13 +19,21 @@ static void* duplex_peer_handle_joiners(void *arg) {
 
     assert(read(socket, &joiner, sizeof(void*)) == sizeof(void*));
 
-    void* result = joiner->function(joiner->args);
+    joiner->result = joiner->function(joiner->args);
 
-    assert(write(socket, &result, sizeof(void*)) == sizeof(void*));
-    // if the session is closed, set closed and break
+    char ok[] = { 0 };
+    assert(write(socket, ok, sizeof(char)) == sizeof(char));
+
+    // if peer->closed is set, break and close our end of the socket
+    if (peer->closed)
+      break;
   }
 
   // close socket[1] (close function for peer will close socket[0])
+  close(socket);
+
+  // and end this thread
+  pthread_exit(NULL);
 }
 
 duplex_peer* duplex_peer_new() {

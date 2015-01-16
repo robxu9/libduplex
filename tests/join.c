@@ -15,7 +15,7 @@ static void* inside_join(void* args) {
 
   ck_assert_msg(pthread_equal(main, this) == 0, "pthreads should be different");
 
-  return NULL;
+  return "OK";
 }
 
 START_TEST(test_join)
@@ -31,9 +31,18 @@ START_TEST(test_join)
   joiner.function = inside_join;
   joiner.args = &self;
 
-  void* result = duplex_peer_join_th(peer, &joiner);
+  duplex_err err = duplex_peer_join_th(peer, &joiner);
 
-  ck_assert_msg(result == NULL, "result isn't NULL");
+  ck_assert_msg(err == ERR_NONE, "err != ERR_NONE: %d", err);
+
+  ck_assert_str_eq(joiner.result, "OK");
+
+  // again for posterity's sake
+  err = duplex_peer_join_th(peer, &joiner);
+
+  ck_assert_msg(err == ERR_NONE, "err != ERR_NONE: %d", err);
+
+  ck_assert_str_eq(joiner.result, "OK");
 
 } END_TEST
 
