@@ -13,6 +13,6 @@ typedef struct {
 
 // Join the SSH thread on the specified peer to execute a
 // function. If the peer has closed, returns non-zero.
-duplex_err duplex_peer_join_th(duplex_peer *peer, duplex_joiner *joiner);
+duplex_err _duplex_join(duplex_peer *peer, duplex_joiner *joiner);
 
 #endif

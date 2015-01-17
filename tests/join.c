@@ -33,14 +33,14 @@ START_TEST(test_join)
   joiner.function = inside_join;
   joiner.args = &self;
 
-  duplex_err err = duplex_peer_join_th(peer, &joiner);
+  duplex_err err = _duplex_join(peer, &joiner);
 
   ck_assert_msg(err == ERR_NONE, "err != ERR_NONE: %d", err);
 
   ck_assert_str_eq(joiner.result, "OK");
 
   // again for posterity's sake
-  err = duplex_peer_join_th(peer, &joiner);
+  err = _duplex_join(peer, &joiner);
 
   ck_assert_msg(err == ERR_NONE, "err != ERR_NONE: %d", err);
 

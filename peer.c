@@ -104,7 +104,7 @@ duplex_err duplex_peer_close(duplex_peer *peer) {
   joiner.function = _duplex_peer_close;
   joiner.args = peer;
 
-  return duplex_peer_join_th(peer, &joiner);
+  return _duplex_join(peer, &joiner);
 }
 
 int duplex_peer_free(duplex_peer *peer) {
@@ -264,7 +264,7 @@ duplex_err duplex_peer_connect(duplex_peer *peer, const char* endpoint) {
 
   joiner.args = &args;
 
-  duplex_err err = duplex_peer_join_th(peer, &joiner);
+  duplex_err err = _duplex_join(peer, &joiner);
   if (err != ERR_NONE) // something went wrong?
     return err;
 

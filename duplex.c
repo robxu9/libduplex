@@ -23,7 +23,7 @@ void duplex_cleanup() {
 // Internal.
 // Join the SSH thread for SSH session operations.
 // Returns non-zero if the peer has closed.
-duplex_err duplex_peer_join_th(duplex_peer *peer, duplex_joiner *joiner) {
+duplex_err _duplex_join(duplex_peer *peer, duplex_joiner *joiner) {
   assert(pthread_mutex_lock(&peer->mutex) == 0);
 
   int socket = peer->socket[0];
