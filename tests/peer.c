@@ -1,7 +1,6 @@
 #include <check.h>
 #include <errno.h>
 #include <pthread.h>
-#include <stdio.h>
 #include <string.h>
 #include "../duplex_internal.h"
 
@@ -29,6 +28,37 @@ START_TEST(test_peer_updown)
   duplex_cleanup();
 } END_TEST
 
+START_TEST(test_peer_endpoint_parse)
+{
+  char endpoint_tmp[1024];
+  int result;
+
+  char* hostname;
+  int port = 0;
+
+  char* endpoints[] = { "unix:///tmp/test", "tcp://127.0.0.1:333", "tcp://127.0.0.1", "malformed", "unknown://some_protocol" };
+  int results[] = { 1, 0, 0, -1, -1 };
+  char* hostnames[] = { "/tmp/test", "127.0.0.1", "127.0.0.1", "", "" };
+  int ports[] = { 0, 333, 2259, 0, 0 };
+
+  int i;
+  for (i = 0; i < 5; i++) {
+    strcpy(endpoint_tmp, endpoints[i]);
+
+    result = _duplex_endpoint_parse(endpoint_tmp, &hostname, &port);
+    ck_assert_msg(result == results[i], "result == results[i] failed: result = %d, results[i] = %d, endpoint = %s", result, results[i], endpoints[i]);
+
+    if (result != -1) {
+      ck_assert_str_eq(hostname, hostnames[i]);
+
+      if (result != 1) { // if not unix, since unix doesn't touch ports
+        ck_assert_int_eq(port, ports[i]);
+      }
+    }
+  }
+
+} END_TEST
+
 Suite*
 make_suite()
 {
@@ -36,6 +66,7 @@ make_suite()
 
   TCase *tc = tcase_create("Testcases");
   tcase_add_test(tc, test_peer_updown);
+  tcase_add_test(tc, test_peer_endpoint_parse);
 
   suite_add_tcase(s, tc);
 

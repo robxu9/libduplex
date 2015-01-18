@@ -5,7 +5,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <sys/un.h>
 #include <unistd.h>
 
 #include <libssh/libssh.h>
@@ -132,91 +131,46 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
   duplex_peer *peer = s->peer;
   const char* endpoint = s->endpoint;
 
+  ssh_session session = ssh_new();
+  if (session == NULL)
+    return ERR_LIBSSH;
+
   // parse the endpoint
   char* endpointcpy = malloc(strlen(endpoint) + 1);
-  if (endpointcpy == NULL)
+  if (endpointcpy == NULL) {
+    ssh_free(session);
     return ERR_ALLOC;
-
-  // see if we can grab the protocol
-  char* tok = strtok(endpointcpy, "://");
-  if (tok == NULL) {// there is none
-    free(endpointcpy);
-
-    return ERR_ARGS;
   }
 
-  ssh_session session = ssh_new();
-  if (session == NULL) {
-    free(endpointcpy);
-
-    return ERR_LIBSSH;
-  }
-
-  // handle based on the protocol
-  if (!strcmp(tok, "tcp")) {
-    // tcp://location:port
-    tok = strtok(NULL, "://");
-    if (tok == NULL)
+  char* hostname;
+  int port;
+  switch (_duplex_endpoint_parse(endpointcpy, &hostname, &port)) {
+  case 0: // tcp
+    ssh_options_set(session, SSH_OPTIONS_HOST, hostname);
+    ssh_options_set(session, SSH_OPTIONS_PORT, &port);
+  case 1:
+  {
+    // path is in hostname
+    int fd = _duplex_socket_unix_connect(hostname);
+    if (fd < 0) // guess what, we couldn't connect to this path
       goto connect_bad_endpoint;
-    // location:port
 
-    // now split by :
-    tok = strtok(tok, ":");
-    if (tok == NULL)
-      goto connect_bad_endpoint;
-    // location
-    char* location = tok;
+    char host[1023];
+    assert(gethostname(host, 1023) == 0);
 
-    // port
-    char* port = "2259";
-    tok = strtok(NULL, ":");
-    if (tok != NULL)
-      port = tok;
+    char* full_endpoint = malloc(strlen(host) + strlen(hostname) + 2);
+    assert(full_endpoint != NULL);
 
-    ssh_options_set(session, SSH_OPTIONS_HOST, location);
-    ssh_options_set(session, SSH_OPTIONS_PORT_STR, port);
-
-  } else if (!strcmp(tok, "unix")) {
-    // unix:///path/to/socket
-    tok = strtok(NULL, "://");
-    if (tok == NULL)
-      goto connect_bad_endpoint;
-    // /path/to/socket
-
-    // try opening a path to this socket
-
-    int fd;
-
-    if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
-      // we can't even make the fd /sigh
-      goto connect_bad_endpoint;
-    }
-
-    struct sockaddr_un sa; // socket address
-    memset(&sa, 0, sizeof(sa)); // clear the stack alloc
-
-    sa.sun_family = AF_UNIX;
-    strcpy(sa.sun_path, tok);
-
-    int connect_len = strlen(sa.sun_path) + sizeof(sa.sun_family);
-
-    if (connect(fd, (struct sockaddr*) &sa, connect_len)) {
-      // we can't connect... so time to exit
-      goto connect_bad_endpoint;
-    }
-
-    char hostname[1023];
-    assert(gethostname(hostname, 1023) == 0);
-
-    char* full_endpoint = malloc(1023 + strlen(tok) + 2);
-    strcpy(full_endpoint, hostname);
+    strcpy(full_endpoint, host);
     strcat(full_endpoint, ":");
-    strcat(full_endpoint, tok);
+    strcat(full_endpoint, hostname);
 
     ssh_options_set(session, SSH_OPTIONS_HOST, full_endpoint);
     ssh_options_set(session, SSH_OPTIONS_FD, &fd);
+
     free(full_endpoint);
-  } else {
+  }
+  default:
     goto connect_bad_endpoint;
   }
 
