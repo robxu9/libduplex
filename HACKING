@@ -36,6 +36,7 @@ Add debugging symbols and make all warnings errors:
 
 If you want to gdb the unit tests, you'll need the following environment variable:
   CK_FORK=no (in order to prevent check from forking every test)
+  CK_VERBOSITY=verbose (if you want to see every test run)
 
 Internal functions start with "_duplex". Public functions are declared in the
   header and start with "duplex_".
@@ -45,3 +46,6 @@ If the method is only going to be used inside a file then mark it static.
 
 If a method is going to be used internally throughout the library, put it in
   duplex_internal.h and implement it in duplex.c.
+
+On Mac OS X, apparently printf doesn't flush on newlines.
+  Use fprintf(stderr, fmt_str) instead.
