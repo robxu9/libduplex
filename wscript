@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 # encoding: utf-8
 
+import waflib
+
 APPNAME = 'libduplex'
 VERSION = '0.0.1'
 
@@ -17,16 +19,19 @@ SOURCES = [
     'peer.c'
     ]
 
+def init(ctx):
+    ctx.load('build_logs', tooldir='./waftools/')
+
 def options(opt):
     opt.load('compiler_c')
     opt.load('gnu_dirs')
-    opt.load('cflags', tooldir='./waftools/')
     opt.load('waf_unit_test')
+    opt.add_option('--debug', default=False, dest='debug', action='store_true',
+            help='Enable debug options -g -Wall -D_DEBUG')
 
 def configure(conf):
     conf.load('compiler_c')
     conf.load('gnu_dirs')
-    conf.load('cflags', tooldir='./waftools/')
     conf.load('waf_unit_test')
 
     conf.check(features='c cprogram', lib=['pthread'], uselib_store='PTHREAD')
@@ -44,6 +49,9 @@ def configure(conf):
 
     if conf.env.HAVE_CHECK != 1:
         print("warning: check is not found, unit tests are disabled.")
+
+    if conf.options.debug:
+        conf.env.append_unique('CFLAGS', ['-g', '-Wall', '-D_DEBUG'])
 
 def build(bld):
     USE=['LIBSSH', 'LIBSSH_THREADS', 'PTHREAD', 'UUID']

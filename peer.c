@@ -2,12 +2,14 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #include <libssh/libssh.h>
+#include <libssh/callbacks.h>
 
 #include "duplex_internal.h"
 #include "uthash.h"
@@ -39,6 +41,15 @@ static void* duplex_peer_handle_joiners(void *arg) {
 
   // and end this thread
   pthread_exit(NULL);
+}
+
+// To be used as the global request handler for ssh sessions
+static void _duplex_peer_global_handle(ssh_session session, ssh_message message, void *userdata) {
+  duplex_peer *peer = (duplex_peer*) userdata;
+
+  fprintf(stderr, "got here");
+
+  assert(peer != NULL);
 }
 
 duplex_peer* duplex_peer_new() {
@@ -142,13 +153,16 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
     return ERR_ALLOC;
   }
 
+  strcpy(endpointcpy, endpoint);
+
   char* hostname;
   int port;
   switch (_duplex_endpoint_parse(endpointcpy, &hostname, &port)) {
   case 0: // tcp
     ssh_options_set(session, SSH_OPTIONS_HOST, hostname);
     ssh_options_set(session, SSH_OPTIONS_PORT, &port);
-  case 1:
+    break;
+  case 1: // unix
   {
     // path is in hostname
     int fd = _duplex_socket_unix_connect(hostname);
@@ -169,10 +183,26 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
     ssh_options_set(session, SSH_OPTIONS_FD, &fd);
 
     free(full_endpoint);
+    break;
   }
   default:
+    fprintf(stderr, "YIKES");
     goto connect_bad_endpoint;
   }
+
+  DEBUG_FUNC(
+  int log_func_level = SSH_LOG_FUNCTIONS;
+  ssh_options_set(session, SSH_OPTIONS_LOG_VERBOSITY, &log_func_level);
+  );
+
+  // set callbacks
+  struct ssh_callbacks_struct cb = {
+    .userdata = peer,
+    .global_request_function = _duplex_peer_global_handle
+  };
+
+  ssh_callbacks_init(&cb);
+  assert(ssh_set_callbacks(session, &cb) == SSH_OK);
 
   // moment of truth
   int rc = ssh_connect(session);
@@ -181,6 +211,18 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
     free(endpointcpy);
     ssh_free(session);
     return ERR_FAIL;
+  }
+
+  // FIXME touch known_hosts?
+
+  // authenticate
+  int auth = ssh_userauth_publickey_auto(session, NULL, NULL);
+  if (auth != SSH_AUTH_SUCCESS) {
+    // failed to authenticate
+    ssh_disconnect(session);
+    ssh_free(session);
+    free(endpointcpy);
+    return ERR_AUTH;
   }
 
   ssh_set_blocking(session, 0);

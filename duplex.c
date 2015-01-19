@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -98,7 +99,7 @@ int _duplex_endpoint_parse(char* endpoint, char** hostname, int* port) {
   return -1;
 }
 
-int _duplex_socket_unix_connect(char* path) {
+int _duplex_socket_unix_connect(const char* path) {
   // try opening a path to this socket.
   int fd;
 
@@ -108,12 +109,12 @@ int _duplex_socket_unix_connect(char* path) {
   }
 
   struct sockaddr_un sa; // socket address
-  memset(&sa, 0, sizeof(sa)); // clear the stack alloc
+  memset(&sa, 0, sizeof(struct sockaddr_un)); // clear the stack alloc
 
   sa.sun_family = AF_UNIX;
   strcpy(sa.sun_path, path);
 
-  int connect_len = strlen(sa.sun_path) + sizeof(sa.sun_family);
+  int connect_len = SUN_LEN(&sa);
 
   if (connect(fd, (struct sockaddr*) &sa, connect_len)) {
     // we can't connect... so time to exit

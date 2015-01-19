@@ -8,10 +8,18 @@ def build(bld):
 
     if bld.is_install:
         return
+
+    USE = ['duplex', 'CHECK']
     
     # tests
-    bld.program(features='test', source='join.c', target='join', use=['duplex', 'CHECK'])
-    bld.program(features='test', source='peer.c', target='peer', use=['duplex', 'CHECK'])
+    bld.program(features='test', source='join.c', target='join', use=USE)
+    bld.program(features='test', source='peer.c', target='peer', use=USE)
+
+    import os
+    if os.environ.get('GODUPLEX') is not None:
+        bld.program(features='test', source='goduplex.c', target='goduplex', use=USE)
+    else:
+        print("warning: GODUPLEX is not defined, go duplex tests not running.")
     
     # show the summary
     from waflib.Tools import waf_unit_test

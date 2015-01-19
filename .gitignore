@@ -5,6 +5,7 @@
 .waf-*
 .lock-*
 build/
+logs/
 
 ### C ###
 # Object files

@@ -28,7 +28,8 @@ typedef enum {
   ERR_LIBSSH,
   ERR_ALLOC,
   ERR_ARGS,
-  ERR_FAIL
+  ERR_FAIL,
+  ERR_AUTH
 } duplex_err;
 
 #endif

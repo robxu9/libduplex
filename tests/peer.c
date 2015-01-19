@@ -36,9 +36,9 @@ START_TEST(test_peer_endpoint_parse)
   char* hostname;
   int port = 0;
 
-  char* endpoints[] = { "unix:///tmp/test", "tcp://127.0.0.1:333", "tcp://127.0.0.1", "malformed", "unknown://some_protocol" };
+  char* endpoints[] = { "unix:///tmp/test_protocol", "tcp://127.0.0.1:333", "tcp://127.0.0.1", "malformed", "unknown://some_protocol" };
   int results[] = { 1, 0, 0, -1, -1 };
-  char* hostnames[] = { "/tmp/test", "127.0.0.1", "127.0.0.1", "", "" };
+  char* hostnames[] = { "/tmp/test_protocol", "127.0.0.1", "127.0.0.1", "", "" };
   int ports[] = { 0, 333, 2259, 0, 0 };
 
   int i;
