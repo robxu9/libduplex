@@ -36,4 +36,8 @@ int _duplex_endpoint_parse(char* endpoint, char** hostname, int* port);
 // an open fd. If fail, returns < 0.
 int _duplex_socket_unix_connect(const char* path);
 
+// Try binding a unix connection to the specified path. If success, returns
+// an open fd. If fail, returns < 0.
+int _duplex_socket_unix_bind(const char* path);
+
 #endif

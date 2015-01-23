@@ -10,9 +10,20 @@
 
 #include <libssh/libssh.h>
 #include <libssh/callbacks.h>
+#include <libssh/server.h>
 
 #include "duplex_internal.h"
 #include "uthash.h"
+
+#ifndef KEYS_FOLDER
+  #ifdef _WIN32
+    #define KEYS_FOLDER
+  #elif __APPLE__
+    #define KEYS_FOLDER "/etc/"
+  #else
+    #define KEYS_FOLDER "/etc/ssh/"
+  #endif
+#endif
 
 // To be passed into pthread_create.
 static void* duplex_peer_handle_joiners(void *arg) {
@@ -131,13 +142,13 @@ int duplex_peer_free(duplex_peer *peer) {
 // duplex_peer_option_get_str
 // duplex_peer_option_get_int
 
-struct _duplex_peer_connect_s {
+struct _duplex_peer_endpoint_s {
   duplex_peer *peer;
   const char* endpoint;
 };
 
 static duplex_err _duplex_peer_connect(void* args, void** result) {
-  struct _duplex_peer_connect_s *s = (struct _duplex_peer_connect_s*) args;
+  struct _duplex_peer_endpoint_s *s = (struct _duplex_peer_endpoint_s*) args;
 
   duplex_peer *peer = s->peer;
   const char* endpoint = s->endpoint;
@@ -186,7 +197,6 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
     break;
   }
   default:
-    fprintf(stderr, "YIKES");
     goto connect_bad_endpoint;
   }
 
@@ -208,6 +218,7 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
   int rc = ssh_connect(session);
   if (rc != SSH_OK) {
     // that didn't work
+    // FIXME: if unix socket, ssh_get_fd and close fd? LEAK?
     free(endpointcpy);
     ssh_free(session);
     return ERR_FAIL;
@@ -219,6 +230,7 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
   int auth = ssh_userauth_publickey_auto(session, NULL, NULL);
   if (auth != SSH_AUTH_SUCCESS) {
     // failed to authenticate
+    // FIXME: if unix socket, ssh_get_fd and close fd? LEAK?
     ssh_disconnect(session);
     ssh_free(session);
     free(endpointcpy);
@@ -254,7 +266,7 @@ duplex_err duplex_peer_connect(duplex_peer *peer, const char* endpoint) {
   duplex_joiner joiner;
   joiner.function = _duplex_peer_connect;
 
-  struct _duplex_peer_connect_s args;
+  struct _duplex_peer_endpoint_s args;
   args.peer = peer;
   args.endpoint = endpoint;
 
@@ -262,6 +274,117 @@ duplex_err duplex_peer_connect(duplex_peer *peer, const char* endpoint) {
 
   duplex_err err = _duplex_join(peer, &joiner);
   if (err != ERR_NONE) // something went wrong?
+    return err;
+
+  return joiner.error;
+}
+
+// duplex_peer_disconnect
+// duplex_peer_connected_len
+// duplex_peer_connected
+
+// FIXME this can be done better:
+// - only one instance of ssh_bind is needed
+// - manage fds individually
+// - call ssh_bind_accept_fd instead
+// - makes it easier to select() on bound fds.
+static duplex_err _duplex_peer_bind(void* args, void** result) {
+  struct _duplex_peer_endpoint_s *s = (struct _duplex_peer_endpoint_s*) args;
+
+  duplex_peer *peer = s->peer;
+  const char* endpoint = s->endpoint;
+
+  ssh_bind server = ssh_bind_new();
+  if (server == NULL)
+    return ERR_LIBSSH;
+
+  // defaults
+  ssh_bind_options_set(server, SSH_BIND_OPTIONS_RSAKEY, KEYS_FOLDER "ssh_host_rsa_key");
+  ssh_bind_options_set(server, SSH_BIND_OPTIONS_DSAKEY, KEYS_FOLDER "ssh_host_dsa_key");
+  ssh_bind_options_set(server, SSH_BIND_OPTIONS_ECDSAKEY, KEYS_FOLDER "ssh_host_ecdsa_key");
+
+  // FIXME read options, use SSH_BIND_OPTIONS_HOSTKEY to set custom keys
+
+  char* endpointcpy = malloc(strlen(endpoint) + 1);
+  if (endpointcpy == NULL) {
+    ssh_bind_free(server);
+    return ERR_ALLOC;
+  }
+
+  strcpy(endpointcpy, endpoint);
+
+  char* hostname;
+  int port;
+  switch (_duplex_endpoint_parse(endpointcpy, &hostname, &port)) {
+  case 0: // tcp
+    ssh_bind_options_set(server, SSH_BIND_OPTIONS_BINDADDR, hostname);
+    ssh_bind_options_set(server, SSH_BIND_OPTIONS_BINDPORT, &port);
+    break;
+  case 1: // unix
+  {
+    // path is in hostname
+    int fd = _duplex_socket_unix_bind(hostname);
+    if (fd < 0) // guess what, we couldn't connect to this path
+      goto bind_bad_endpoint;
+
+    // FIXME: mark O_NONBLOCK?
+
+    // mark it as ready for listening
+    // FIXME: let listening queue be adjustable!
+    if (listen(fd, 10) < 0) {
+      // fail.
+      close(fd);
+      goto bind_bad_endpoint;
+    }
+
+    DEBUG_FUNC(
+    int log_func_level = SSH_LOG_FUNCTIONS;
+    ssh_bind_options_set(server, SSH_BIND_OPTIONS_LOG_VERBOSITY, &log_func_level);
+    );
+
+    ssh_bind_set_fd(server, fd);
+
+    break;
+  }
+  default:
+    goto bind_bad_endpoint;
+  }
+
+  // moment of truth
+  int rc = ssh_bind_listen(server);
+  if (rc) {
+    // fail.
+    // FIXME: if unix socket, get fd from server and close fd - LEAK
+    free(endpointcpy);
+    ssh_bind_free(server);
+    return ERR_FAIL;
+  }
+
+  ssh_bind_set_blocking(server, 0);
+
+  // FIXME insert into peer
+
+  free(endpointcpy);
+  return ERR_NONE;
+
+bind_bad_endpoint:
+  free(endpointcpy);
+  ssh_bind_free(server);
+  return ERR_ARGS;
+}
+
+duplex_err duplex_peer_bind(duplex_peer *peer, const char* endpoint) {
+  duplex_joiner joiner;
+  joiner.function = _duplex_peer_bind;
+
+  struct _duplex_peer_endpoint_s args;
+  args.peer = peer;
+  args.endpoint = endpoint;
+
+  joiner.args = &args;
+
+  duplex_err err = _duplex_join(peer, &joiner);
+  if (err != ERR_NONE)
     return err;
 
   return joiner.error;

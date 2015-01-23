@@ -117,7 +117,7 @@ size_t duplex_peer_bound_len(duplex_peer *peer);
 // Fill in the string array with the list of endpoints currently bound.
 void duplex_peer_bound(duplex_peer *peer, char* endpoints[], size_t size);
 
-// Get the number of remote peers
+// Get the number of remote peers (FIXME: SAME THING AS connected_len)
 size_t duplex_peer_remote_len(duplex_peer *peer);
 
 // Fill in the string array with the list of remote peers.

@@ -124,3 +124,32 @@ int _duplex_socket_unix_connect(const char* path) {
 
   return fd;
 }
+
+int _duplex_socket_unix_bind(const char* path) {
+  // try binding a path to this socket.
+  int fd;
+
+  if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+    // can't even make the fd...
+    return -1;
+  }
+
+  int reuseval = 1;
+  assert(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseval, sizeof(reuseval)) == 0);
+
+  struct sockaddr_un sa;
+  memset(&sa, 0, sizeof(struct sockaddr_un));
+
+  sa.sun_family = AF_UNIX;
+  strcpy(sa.sun_path, path);
+
+  int bind_len = SUN_LEN(&sa);
+
+  if (bind(fd, (struct sockaddr*) &sa, bind_len)) {
+    // bind failed...
+    assert(close(fd) == 0);
+    return -1;
+  }
+
+  return fd;
+}
