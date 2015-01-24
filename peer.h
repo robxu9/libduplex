@@ -52,6 +52,8 @@ typedef struct {
 
   int closed; // if the peer is closed
 
+  ssh_event monitor; // ssh event monitor
+
   duplex_peer_option_map *options; // options for the peer
 
   duplex_peer_session *sessions; // active connections (should only be touched by ssh thread)

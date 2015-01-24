@@ -7,9 +7,6 @@
 #include <string.h>
 #include "../duplex_internal.h"
 
-#include <libssh/buffer.h>
-#include <libssh/session.h>
-#include <libssh/socket.h>
 #include <libssh/libssh.h>
 #include <libssh/callbacks.h>
 
@@ -21,25 +18,7 @@ char* gosocket = NULL;
 
 int init_called = 0;
 
-// START_TEST(test_peer_duplex_connect)
-// {
-//   // fork/no-fork guard
-//   if (!init_called) {
-//     init_called = 1;
-//     duplex_init();
-//   }
-//
-//   duplex_peer *peer = duplex_peer_new();
-//
-//   ck_assert_int_eq(duplex_peer_connect(peer, gosocket), ERR_NONE);
-//
-//   sleep(10);
-//
-//   ck_assert_int_eq(duplex_peer_close(peer), ERR_NONE);
-//   ck_assert_int_eq(duplex_peer_free(peer), 0);
-// } END_TEST
-
-START_TEST(test_peer_libssh_connect)
+START_TEST(test_peer_duplex_connect)
 {
   // fork/no-fork guard
   if (!init_called) {
@@ -47,27 +26,14 @@ START_TEST(test_peer_libssh_connect)
     duplex_init();
   }
 
-  struct ssh_session_struct* session = ssh_new();
-  assert(session != NULL);
+  duplex_peer *peer = duplex_peer_new();
 
-  int port = 9999;
-  ssh_options_set(session, SSH_OPTIONS_HOST, "127.0.0.1");
-  ssh_options_set(session, SSH_OPTIONS_PORT, &port);
+  ck_assert_int_eq(duplex_peer_connect(peer, gosocket), ERR_NONE);
 
-  int log_func_level = SSH_LOG_FUNCTIONS;
-  ssh_options_set(session, SSH_OPTIONS_LOG_VERBOSITY, &log_func_level);
+  sleep(5);
 
-  int rc = ssh_connect(session);
-  assert(rc == SSH_OK);
-
-  // authenticate
-  int auth = ssh_userauth_publickey_auto(session, NULL, NULL);
-  assert(auth == SSH_AUTH_SUCCESS);
-
-  ssh_set_blocking(session, 0);
-
-  sleep(1);
-
+  ck_assert_int_eq(duplex_peer_close(peer), ERR_NONE);
+  ck_assert_int_eq(duplex_peer_free(peer), 0);
 } END_TEST
 
 void
@@ -83,13 +49,7 @@ make_suite()
   Suite *s = suite_create(NAME);
 
   TCase *tc = tcase_create("Testcases");
-//  tcase_add_test(tc, test_peer_duplex_connect);
-
-  char* libssh = getenv("GODUPLEX_TCP");
-  if (libssh != NULL)
-    tcase_add_test(tc, test_peer_libssh_connect);
-  else
-    fprintf(stderr, "skipping libssh direct connect testcase (GODUPLEX_TCP env missing)");
+  tcase_add_test(tc, test_peer_duplex_connect);
 
   suite_add_tcase(s, tc);
 

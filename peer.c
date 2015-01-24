@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -31,20 +32,37 @@ static void* duplex_peer_handle_joiners(void *arg) {
 
   int socket = peer->socket[1];
 
+  int nfds = socket + 1;
+  struct timeval timeout;
+  memset(&timeout, 0, sizeof(struct timeval)); // so secs/msecs ==
+
   // Listen and handle requests
   while(1) {
-    duplex_joiner *joiner = NULL;
+    fd_set toread;
 
-    assert(read(socket, &joiner, sizeof(void*)) == sizeof(void*));
+    FD_ZERO(&toread);
+    FD_SET(socket, &toread);
 
-    joiner->error = joiner->function(joiner->args, &joiner->result);
+    int res = select(nfds, &toread, NULL, NULL, &timeout);
+    assert(res >= 0);
 
-    char ok[] = { 0 };
-    assert(write(socket, ok, sizeof(char)) == sizeof(char));
+    if (res != 0) { // we have stuff!
+      duplex_joiner *joiner = NULL;
 
-    // if peer->closed is set, break and close our end of the socket
-    if (peer->closed)
-      break;
+      assert(read(socket, &joiner, sizeof(void*)) == sizeof(void*));
+
+      joiner->error = joiner->function(joiner->args, &joiner->result);
+
+      char ok[] = { 0 };
+      assert(write(socket, ok, sizeof(char)) == sizeof(char));
+
+      // if peer->closed is set, break and close our end of the socket
+      if (peer->closed)
+        break;
+    }
+
+    // always initiate polling
+    ssh_event_dopoll(peer->monitor, 100);
   }
 
   // close socket[1] (close function for peer will close socket[0])
@@ -68,9 +86,17 @@ duplex_peer* duplex_peer_new() {
   if (peer == NULL)
     return NULL; // errno should still be set
 
+  peer->monitor = ssh_event_new();
+  if (peer->monitor == NULL) {
+    // fail...
+    free(peer);
+    return NULL;
+  }
+
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, peer->socket)) {
     // failed! make sure we save errno, cleanup, leave
     int old_errno = errno;
+    ssh_event_free(peer->monitor);
     free(peer);
     errno = old_errno;
     return NULL;
@@ -82,6 +108,7 @@ duplex_peer* duplex_peer_new() {
     close(peer->socket[0]);
     close(peer->socket[1]);
 
+    ssh_event_free(peer->monitor);
     free(peer);
 
     errno = mutex_init;
@@ -98,6 +125,7 @@ duplex_peer* duplex_peer_new() {
     close(peer->socket[0]);
     close(peer->socket[1]);
 
+    ssh_event_free(peer->monitor);
     free(peer);
 
     errno = thread_init;
@@ -238,6 +266,10 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
   }
 
   ssh_set_blocking(session, 0);
+
+  assert(ssh_event_add_session(peer->monitor, session) == SSH_OK);
+
+  // FIXME add callback for disgraceful disconnects
 
   // FIXME select on the following conditions:
   // ~> get global request from "@duplex-greeting" with name, reply TRUE
