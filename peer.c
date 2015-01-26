@@ -264,8 +264,6 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
 
   cb->userdata = peer;
   cb->global_request_function = _duplex_peer_global_handle;
-  fprintf(stdout, "LOCATION: %p\n", _duplex_peer_global_handle);
-  fflush(stdout);
 
   ssh_callbacks_init(cb);
   assert(ssh_set_callbacks(session, cb) == SSH_OK);
