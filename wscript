@@ -28,6 +28,8 @@ def options(opt):
     opt.load('waf_unit_test')
     opt.add_option('--debug', default=False, dest='debug', action='store_true',
             help='Enable debug options -g -Wall -D_DEBUG')
+    opt.add_option('--utils', default=False, dest='utils', action='store_true',
+            help='Enable building utils')
 
 def configure(conf):
     conf.load('compiler_c')
@@ -60,3 +62,6 @@ def build(bld):
     bld(source='duplex.pc.in', version=VERSION)
     bld.install_files('${INCLUDEDIR}/duplex', HEADERS)
     bld.recurse('tests')
+
+    if bld.options.utils:
+        bld.recurse('utils')

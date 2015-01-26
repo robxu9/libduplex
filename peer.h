@@ -39,9 +39,9 @@ typedef struct {
 
 typedef struct {
   char endpoint[8192];
-  ssh_bind bind;
+  int fd;
   UT_hash_handle hh;
-} duplex_peer_server;
+} duplex_peer_fd;
 
 // Duplex Peer
 typedef struct {
@@ -57,7 +57,9 @@ typedef struct {
   duplex_peer_option_map *options; // options for the peer
 
   duplex_peer_session *sessions; // active connections (should only be touched by ssh thread)
-  duplex_peer_server *servers; // ssh servers (should only be touched by ssh thread)
+
+  ssh_bind bind;
+  duplex_peer_fd *servers; // bound fds (should only be touched by ssh thread)
 } duplex_peer;
 
 // Create a new duplex peer. If there is an error, this returns NULL and

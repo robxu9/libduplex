@@ -1,0 +1,11 @@
+#! /usr/bin/env python
+# encoding: utf-8
+
+def build(bld):
+    if bld.is_install:
+        return
+
+    USE = ['duplex']
+
+    # utils
+    bld.program(source='bare_ssh_test.c', target='bare_ssh_test', use=USE)

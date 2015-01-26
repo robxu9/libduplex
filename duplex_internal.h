@@ -40,4 +40,8 @@ int _duplex_socket_unix_connect(const char* path);
 // an open fd. If fail, returns < 0.
 int _duplex_socket_unix_bind(const char* path);
 
+// Try binding a tcp connection to the specified path. If success, returns
+// an open fd. If fail, returns < 0.
+int _duplex_socket_tcp_bind(const char* hostname, const int port);
+
 #endif

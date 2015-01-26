@@ -93,9 +93,32 @@ duplex_peer* duplex_peer_new() {
     return NULL;
   }
 
+  peer->bind = ssh_bind_new();
+  if (peer->bind == NULL) {
+    // fail...
+    ssh_event_free(peer->monitor);
+    free(peer);
+    return NULL;
+  }
+
+  // set defaults
+  ssh_bind_options_set(peer->bind, SSH_BIND_OPTIONS_RSAKEY, KEYS_FOLDER "ssh_host_rsa_key");
+  ssh_bind_options_set(peer->bind, SSH_BIND_OPTIONS_DSAKEY, KEYS_FOLDER "ssh_host_dsa_key");
+  ssh_bind_options_set(peer->bind, SSH_BIND_OPTIONS_ECDSAKEY, KEYS_FOLDER "ssh_host_ecdsa_key");
+
+  // FIXME when ops are implemented, set options, use SSH_BIND_OPTIONS_HOSTKEY to set custom keys
+
+  ssh_bind_set_blocking(peer->bind, 0);
+
+  DEBUG_FUNC(
+  int log_func_level = SSH_LOG_FUNCTIONS;
+  ssh_bind_options_set(peer->bind, SSH_BIND_OPTIONS_LOG_VERBOSITY, &log_func_level);
+  );
+
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, peer->socket)) {
     // failed! make sure we save errno, cleanup, leave
     int old_errno = errno;
+    ssh_bind_free(peer->bind);
     ssh_event_free(peer->monitor);
     free(peer);
     errno = old_errno;
@@ -108,6 +131,7 @@ duplex_peer* duplex_peer_new() {
     close(peer->socket[0]);
     close(peer->socket[1]);
 
+    ssh_bind_free(peer->bind);
     ssh_event_free(peer->monitor);
     free(peer);
 
@@ -125,6 +149,7 @@ duplex_peer* duplex_peer_new() {
     close(peer->socket[0]);
     close(peer->socket[1]);
 
+    ssh_bind_free(peer->bind);
     ssh_event_free(peer->monitor);
     free(peer);
 
@@ -315,7 +340,6 @@ duplex_err duplex_peer_connect(duplex_peer *peer, const char* endpoint) {
 // duplex_peer_connected_len
 // duplex_peer_connected
 
-// FIXME this can be done better:
 // - only one instance of ssh_bind is needed
 // - manage fds individually
 // - call ssh_bind_accept_fd instead
@@ -326,83 +350,64 @@ static duplex_err _duplex_peer_bind(void* args, void** result) {
   duplex_peer *peer = s->peer;
   const char* endpoint = s->endpoint;
 
-  ssh_bind server = ssh_bind_new();
-  if (server == NULL)
-    return ERR_LIBSSH;
-
-  // defaults
-  ssh_bind_options_set(server, SSH_BIND_OPTIONS_RSAKEY, KEYS_FOLDER "ssh_host_rsa_key");
-  ssh_bind_options_set(server, SSH_BIND_OPTIONS_DSAKEY, KEYS_FOLDER "ssh_host_dsa_key");
-  ssh_bind_options_set(server, SSH_BIND_OPTIONS_ECDSAKEY, KEYS_FOLDER "ssh_host_ecdsa_key");
-
-  // FIXME read options, use SSH_BIND_OPTIONS_HOSTKEY to set custom keys
+  duplex_err err = ERR_NONE;
 
   char* endpointcpy = malloc(strlen(endpoint) + 1);
-  if (endpointcpy == NULL) {
-    ssh_bind_free(server);
+  if (endpointcpy == NULL)
     return ERR_ALLOC;
-  }
 
   strcpy(endpointcpy, endpoint);
 
   char* hostname;
   int port;
-  switch (_duplex_endpoint_parse(endpointcpy, &hostname, &port)) {
+
+  int type = _duplex_endpoint_parse(endpointcpy, &hostname, &port);
+  int fd;
+
+  switch(type) {
   case 0: // tcp
-    ssh_bind_options_set(server, SSH_BIND_OPTIONS_BINDADDR, hostname);
-    ssh_bind_options_set(server, SSH_BIND_OPTIONS_BINDPORT, &port);
-    break;
+    fd = _duplex_socket_tcp_bind(hostname, port);
   case 1: // unix
-  {
-    // path is in hostname
-    int fd = _duplex_socket_unix_bind(hostname);
-    if (fd < 0) // guess what, we couldn't connect to this path
-      goto bind_bad_endpoint;
-
-    // FIXME: mark O_NONBLOCK?
-
-    // mark it as ready for listening
-    // FIXME: let listening queue be adjustable!
-    if (listen(fd, 10) < 0) {
-      // fail.
-      close(fd);
-      goto bind_bad_endpoint;
-    }
-
-    DEBUG_FUNC(
-    int log_func_level = SSH_LOG_FUNCTIONS;
-    ssh_bind_options_set(server, SSH_BIND_OPTIONS_LOG_VERBOSITY, &log_func_level);
-    );
-
-    ssh_bind_set_fd(server, fd);
-
-    break;
-  }
-  default:
-    goto bind_bad_endpoint;
+    fd = _duplex_socket_unix_bind(hostname);
+  default: // ??
+    goto bind_bad_cleanup;
   }
 
-  // moment of truth
-  int rc = ssh_bind_listen(server);
-  if (rc) {
+  if (fd < 0) // couldn't make
+    goto bind_bad_cleanup;
+
+  // set O_NONBLOCK
+  int flags = fcntl(fd, F_GETFL, 0);
+  if (fcntl(fd, F_SETFL, flags | O_NONBLOCK)) {
+    // why.
+    close(fd);
+    goto bind_bad_cleanup;
+  }
+
+  // mark it as ready for listening
+  // FIXME: let listening queue be adjustable!
+  if (listen(fd, 10) < 0) {
     // fail.
-    // FIXME: if unix socket, get fd from server and close fd - LEAK
-    free(endpointcpy);
-    ssh_bind_free(server);
-    return ERR_FAIL;
+    close(fd);
+    goto bind_bad_cleanup;
   }
 
-  ssh_bind_set_blocking(server, 0);
+  // add to peer->servers (duplex_peer_fd)
+  duplex_peer_fd *peer_fd = malloc(sizeof(duplex_peer_fd));
+  assert(peer_fd != NULL);
 
-  // FIXME insert into peer
+  strcpy(peer_fd->endpoint, endpoint);
+  peer_fd->fd = fd;
 
+  HASH_ADD_STR(peer->servers, endpoint, peer_fd);
+
+  goto bind_cleanup;
+
+bind_bad_cleanup:
+  err = ERR_ARGS;
+bind_cleanup:
   free(endpointcpy);
-  return ERR_NONE;
-
-bind_bad_endpoint:
-  free(endpointcpy);
-  ssh_bind_free(server);
-  return ERR_ARGS;
+  return err;
 }
 
 duplex_err duplex_peer_bind(duplex_peer *peer, const char* endpoint) {

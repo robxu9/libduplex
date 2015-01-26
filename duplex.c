@@ -2,6 +2,9 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
@@ -151,5 +154,51 @@ int _duplex_socket_unix_bind(const char* path) {
     return -1;
   }
 
+  return fd;
+}
+
+int _duplex_socket_tcp_bind(const char* hostname, const int port) {
+  // call getaddrinfo
+  struct addrinfo hints;
+  memset(&hints, 0, sizeof(struct addrinfo));
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+
+  struct addrinfo *res, *i;
+
+  char port_digits[6]; // largest port is 65535<NUL>
+  assert(sprintf(port_digits, "%d", port) >= 0);
+
+  if (getaddrinfo(hostname, port_digits, &hints, &res) != 0) {
+    // can't get the addr info...
+    return -1;
+  }
+
+  int fd;
+
+  for (i = res; i != NULL; i = i->ai_next) {
+    if ((fd = socket(i->ai_family, i->ai_socktype, i->ai_protocol)) < 0) {
+      // guess this doesn't work
+      continue;
+    }
+
+    int reuseval = 1;
+    assert(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseval, sizeof(reuseval)) == 0);
+
+    if (bind(fd, i->ai_addr, i->ai_addrlen)) {
+      // that didn't work.
+      close(fd);
+      continue;
+    }
+
+    break;
+  }
+
+  if (i == NULL) {// couldn't bind at all
+    freeaddrinfo(res);
+    return -1;
+  }
+
+  freeaddrinfo(res);
   return fd;
 }
