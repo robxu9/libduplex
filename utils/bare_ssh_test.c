@@ -1,5 +1,6 @@
 #include <assert.h>
 
+#include <libssh/callbacks.h>
 #include <libssh/libssh.h>
 
 int

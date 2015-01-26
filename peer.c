@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -73,7 +74,7 @@ static void* duplex_peer_handle_joiners(void *arg) {
 }
 
 // To be used as the global request handler for ssh sessions
-static void _duplex_peer_global_handle(ssh_session session, ssh_message message, void *userdata) {
+void _duplex_peer_global_handle(ssh_session session, ssh_message message, void *userdata) {
   duplex_peer *peer = (duplex_peer*) userdata;
 
   fprintf(stderr, "got here");
@@ -259,13 +260,15 @@ static duplex_err _duplex_peer_connect(void* args, void** result) {
   );
 
   // set callbacks
-  struct ssh_callbacks_struct cb = {
-    .userdata = peer,
-    .global_request_function = _duplex_peer_global_handle
-  };
+  struct ssh_callbacks_struct *cb = calloc(1, sizeof(struct ssh_callbacks_struct));
 
-  ssh_callbacks_init(&cb);
-  assert(ssh_set_callbacks(session, &cb) == SSH_OK);
+  cb->userdata = peer;
+  cb->global_request_function = _duplex_peer_global_handle;
+  fprintf(stdout, "LOCATION: %p\n", _duplex_peer_global_handle);
+  fflush(stdout);
+
+  ssh_callbacks_init(cb);
+  assert(ssh_set_callbacks(session, cb) == SSH_OK);
 
   // moment of truth
   int rc = ssh_connect(session);
